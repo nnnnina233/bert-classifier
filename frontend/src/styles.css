@@ -1,0 +1,54 @@
+/* 基础布局与表单样式 */
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  color: #222;
+  background: #fff;
+  font-synthesis: none;
+  -webkit-font-smoothing: antialiased;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+.app-shell { max-width: 880px; margin: 32px auto; padding: 0 24px; }
+.topbar, .section-header, .input-bottom, footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.topbar { padding-bottom: 16px; border-bottom: 1px solid #ddd; }
+h1 { margin: 0; font-size: 26px; font-weight: 600; }
+h2 { margin: 0; font-size: 16px; font-weight: 600; }
+a { color: #245ca6; font-size: 14px; }
+.description { margin: 20px 0 28px; color: #666; font-size: 14px; line-height: 1.7; }
+.workspace { display: grid; gap: 32px; }
+.section-header { margin-bottom: 12px; }
+button, textarea { font: inherit; }
+button { padding: 7px 14px; border: 1px solid #ccc; border-radius: 4px; background: #fff; color: #333; font-size: 14px; cursor: pointer; }
+button:hover:not(:disabled) { background: #f3f3f3; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+button:focus-visible, a:focus-visible, summary:focus-visible { outline: 2px solid #245ca6; outline-offset: 3px; }
+.primary-button { background: #245ca6; color: #fff; border-color: #245ca6; }
+.primary-button:hover:not(:disabled) { background: #1c4a86; }
+textarea { display: block; width: 100%; min-height: 160px; resize: vertical; padding: 12px; border: 1px solid #bbb; border-radius: 4px; color: #222; background: #fff; font-size: 14px; line-height: 1.8; }
+textarea:focus { outline: 2px solid #245ca6; outline-offset: 1px; }
+textarea::placeholder { color: #999; }
+.input-bottom { margin-top: 8px; font-size: 12px; color: #666; align-items: baseline; }
+.input-bottom > :last-child { white-space: nowrap; }
+.form-actions { display: flex; gap: 10px; margin-top: 16px; }
+.invalid, .error-message { color: #b42318; }
+.error-message { font-size: 14px; line-height: 1.6; }
+.placeholder { padding: 20px 0; margin: 0; color: #777; font-size: 14px; }
+.result-summary, .help-text { color: #666; font-size: 12px; line-height: 1.7; }
+.result-summary { margin: 0 0 10px; }
+.table-wrapper { width: 100%; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 11px 12px; border: 1px solid #ddd; line-height: 1.6; }
+th { font-weight: 500; background: #f5f5f5; }
+td:first-child { overflow-wrap: anywhere; }
+th:nth-child(n+2), td:nth-child(n+2) { white-space: nowrap; }
+.help-text { margin: 10px 0 0; }
+.categories { margin-top: 28px; font-size: 13px; color: #666; line-height: 1.8; }
+.categories summary { cursor: pointer; }
+.categories p { margin: 8px 0 0; overflow-wrap: anywhere; }
+footer { margin-top: 28px; padding-top: 16px; border-top: 1px solid #ddd; color: #666; font-size: 12px; }
+footer button { padding: 5px 10px; font-size: 12px; white-space: nowrap; }
+@media (max-width: 600px) {
+  .app-shell { margin: 20px auto; padding: 0 16px; }
+  h1 { font-size: 23px; }
+  th, td { padding: 8px; font-size: 13px; }
+}

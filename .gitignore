@@ -1,0 +1,39 @@
+# 本地环境与配置
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+.vscode/
+.idea/
+
+# React 前端依赖与构建产物
+node_modules/
+frontend/dist/
+
+# Python 缓存
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.playwright-mcp/
+.coverage
+htmlcov/
+*.egg-info/
+
+# 大型模型、训练产物和本地数据（保留本地文件，不上传 GitHub）
+models/
+checkpoints/
+ckp/
+data/raw/
+data/processed/
+logs/
+log/
+.cache/
+*.pt
+*.pth
+*.safetensors
+*.arrow
+
+# 系统文件
+.DS_Store
+Thumbs.db

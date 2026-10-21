@@ -1,0 +1,10 @@
+# Python 3.11+；PyTorch 的 CUDA 构建按机器选择，见 README。
+torch==2.11.0
+transformers==5.12.1
+datasets==5.0.1
+scikit-learn==1.9.0
+tensorboard==2.21.0
+tqdm==4.68.3
+fastapi==0.138.0
+uvicorn==0.49.0
+pydantic==2.13.4

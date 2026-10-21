@@ -20,12 +20,13 @@ __pycache__/
 htmlcov/
 *.egg-info/
 
-# 大型模型、训练产物和本地数据（保留本地文件，不上传 GitHub）
+# 模型、数据与训练产物
 models/
 checkpoints/
 ckp/
 data/raw/
 data/processed/
+data/indexes/
 logs/
 log/
 .cache/

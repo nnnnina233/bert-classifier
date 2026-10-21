@@ -10,7 +10,7 @@ from src.runner.train import Trainer, TrainConfig
 
 
 def evaluate(model_path=CKP_DIR / "best", split="validation", device=None, batch_size=BATCH_SIZE):
-    """评估已保存的模型；最终测试时传入 split='test'。"""
+    """在验证集或测试集上评估模型。"""
     if split not in ("validation", "test"):
         raise ValueError("split 必须是 validation 或 test。")
     if batch_size <= 0:
@@ -27,7 +27,6 @@ def evaluate(model_path=CKP_DIR / "best", split="validation", device=None, batch
         model_path, local_files_only=True,
     ).to(device)
 
-    # 数据已经完成分词；直接使用与训练相同的 collator。
     valid_dataset = get_dataset(split)
     if len(valid_dataset) == 0:
         raise ValueError(f"{split} 数据集为空，无法评估。")
@@ -35,7 +34,7 @@ def evaluate(model_path=CKP_DIR / "best", split="validation", device=None, batch
         valid_dataset, batch_size=batch_size, shuffle=False,
         collate_fn=default_data_collator,
     )
-    # 补齐 Trainer 的初始化参数；本入口只调用 evaluate，不执行训练。
+    # 复用 Trainer 的评估方法，关闭断点恢复。
     train_loader = DataLoader(
         get_dataset("train"), batch_size=batch_size, shuffle=False,
         collate_fn=default_data_collator, generator=torch.Generator(),
@@ -62,4 +61,4 @@ def evaluate(model_path=CKP_DIR / "best", split="validation", device=None, batch
     return result
 
 if __name__ == "__main__":
-    evaluate(split = "test")  # 测试时使用 test 数据集
+    evaluate(split="test")

@@ -28,6 +28,9 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [elapsed, setElapsed] = useState(null);
+  const [showNeighbors, setShowNeighbors] = useState(false);
+  const [retrieval, setRetrieval] = useState(null);
+  const [retrievalChecking, setRetrievalChecking] = useState(false);
   const inputRef = useRef(null);
   const requestRef = useRef(null);
   const texts = input.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -58,6 +61,25 @@ export default function App() {
     return () => { controller.abort(); requestRef.current?.abort(); };
   }, []);
 
+  useEffect(() => {
+    if (!showNeighbors) return;
+    const controller = new AbortController();
+    setRetrievalChecking(true);
+    setRetrieval(null);
+    api('/retrieval/health', { signal: controller.signal })
+      .then((status) => { if (!controller.signal.aborted) setRetrieval(status); })
+      .catch((error) => {
+        if (!controller.signal.aborted) setRetrieval({ status: 'unavailable', detail: error.message });
+      })
+      .finally(() => { clearTimeout(timeout); if (!controller.signal.aborted) setRetrievalChecking(false); });
+    const timeout = setTimeout(() => {
+      setRetrieval({ status: 'unavailable', detail: '加载检索超时，请稍后重新开启此选项。' });
+      setRetrievalChecking(false);
+      controller.abort();
+    }, 60000);
+    return () => { clearTimeout(timeout); controller.abort(); };
+  }, [showNeighbors]);
+
   async function classify(event) {
     event.preventDefault();
     if (!texts.length || validation || busy) return;
@@ -70,7 +92,7 @@ export default function App() {
     requestRef.current = controller;
     const timeout = setTimeout(() => controller.abort(), 60000);
     try {
-      const data = await api('/predict', {
+      const data = await api(showNeighbors ? '/analyze' : '/predict', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ texts }), signal: controller.signal,
       });
@@ -144,8 +166,14 @@ export default function App() {
                 <span>{texts.length} / 32</span>
               </div>
               {error && <p className="error-message" role="alert">{error}</p>}
+              <div className="retrieval-options">
+                <label><input type="checkbox" checked={showNeighbors} disabled={busy} onChange={(event) => { setShowNeighbors(event.target.checked); setError(''); }} /> 显示相似商品</label>
+                {showNeighbors && retrievalChecking && <span role="status">正在加载本地检索…</span>}
+                {showNeighbors && !retrievalChecking && retrieval?.status === 'ready' && <span>索引已就绪，共 {retrieval.count} 条商品</span>}
+                {showNeighbors && !retrievalChecking && retrieval?.status === 'unavailable' && <p className="error-message" role="alert">{retrieval.detail} 可关闭“显示相似商品”继续分类。</p>}
+              </div>
               <div className="form-actions">
-                <button type="submit" className="primary-button" disabled={busy || !texts.length || !!validation}>
+                <button type="submit" className="primary-button" disabled={busy || !texts.length || !!validation || (showNeighbors && (retrievalChecking || retrieval?.status !== 'ready'))}>
                   {busy ? '正在分类…' : '开始分类'}
                 </button>
                 <button type="button" onClick={clear} disabled={busy || (!input && !results.length)}>清空</button>
@@ -168,7 +196,22 @@ export default function App() {
                         <thead><tr><th scope="col">商品标题</th><th scope="col">类别</th><th scope="col">置信分数</th></tr></thead>
                         <tbody>{results.map((item, index) => (
                           <tr key={`${index}-${item.text}`}>
-                            <td>{item.text}</td>
+                            <td>
+                              {item.text}
+                              {Array.isArray(item.neighbors) && (
+                                <details className="neighbors">
+                                  <summary>查看相似商品（{item.neighbors.length}）</summary>
+                                  {item.neighbors.length > 0 ? <ol>{item.neighbors.map((neighbor) => (
+                                    <li key={neighbor.source_id}>
+                                      <div>{neighbor.text}</div>
+                                      <div className="neighbor-meta">类别：{neighbor.label} · 余弦相似度：{neighbor.similarity.toFixed(3)}</div>
+                                      <small className="source-id" title={neighbor.source_id}>来源：{neighbor.source_id}</small>
+                                    </li>
+                                  ))}</ol> : <p>暂无参考商品。</p>}
+                                  <p className="help-text">参考样本来自训练集，不改变 BERT 分类结果；相似度不是分类置信分数。</p>
+                                </details>
+                              )}
+                            </td>
                             <td>{item.label}</td>
                             <td>{(item.confidence * 100).toFixed(1)}%</td>
                           </tr>

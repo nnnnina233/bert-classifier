@@ -1,4 +1,4 @@
-"""从项目根目录运行 python -m src --help。"""
+"""项目命令行入口。"""
 import argparse
 import json
 
@@ -10,6 +10,8 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     commands.add_parser("preprocess", help="预处理 data/raw 下的数据")
     commands.add_parser("train", help="训练模型，自动恢复已有检查点")
+    indexing = commands.add_parser("build-index", help="构建本地商品向量索引")
+    indexing.add_argument("--max-per-class", type=int, default=200, help="每类最多抽取的样本数；0 表示全量")
     evaluation = commands.add_parser("evaluate", help="评估已训练模型")
     evaluation.add_argument("--split", choices=["validation", "test"], default="test")
     evaluation.add_argument("--model-path", default=str(INFERENCE_MODEL_PATH))
@@ -23,7 +25,14 @@ def main():
     server.add_argument("--reload", action="store_true", help="开发时自动重载")
     args = parser.parse_args()
 
-    if args.command == "preprocess":
+    if args.command == "build-index":
+        from src.retrieval.index import build_index
+        if args.max_per_class < 0:
+            parser.error("--max-per-class 不能小于 0")
+        import torch
+        torch.set_num_threads(min(4, torch.get_num_threads()))
+        build_index(max_per_class=args.max_per_class)
+    elif args.command == "preprocess":
         from src.process.preprocess import preprocess
         preprocess()
     elif args.command == "train":

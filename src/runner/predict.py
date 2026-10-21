@@ -1,4 +1,4 @@
-"""命令行和 FastAPI 共用的本地模型预测器。"""
+"""加载微调模型并预测商品类别。"""
 from pathlib import Path
 from threading import Lock
 
@@ -58,7 +58,7 @@ class Predictor:
         ]
 
     def predict(self, input_data):
-        """保留原有返回标签列表的调用方式。"""
+        """返回类别名称列表。"""
         return [item["label"] for item in self.predict_details(input_data)]
 
 

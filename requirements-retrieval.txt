@@ -1,0 +1,7 @@
+-r requirements.txt
+langchain==1.4.6
+langchain-core==1.6.12
+langchain-community==0.4.2
+langchain-huggingface==1.2.3
+sentence-transformers==6.1.0
+faiss-cpu==1.15.1

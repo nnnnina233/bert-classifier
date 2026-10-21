@@ -29,7 +29,7 @@ from sklearn.metrics import classification_report, accuracy_score, f1_score, pre
 
 
 def replace_checkpoint(temporary, destination):
-    """Retry transient Windows sharing locks without rewriting the checkpoint."""
+    """重试 Windows 文件占用导致的替换失败。"""
     for attempt in range(8):
         try:
             temporary.replace(destination)
@@ -69,7 +69,6 @@ class Trainer:
         device,
         training_config,
     ):
-        # 模型已在外面移到指定设备
         self.model = model
         self.tokenizer = tokenizer
         self.optimizer = optimizer
@@ -113,7 +112,7 @@ class Trainer:
         )
 
     def checkpoint_signature(self):
-        """恢复时确保数据、批次划分和类别含义没有改变。"""
+        """记录恢复训练时需要核对的配置。"""
         return {
             "dataset_size": len(self.train_loader.dataset),
             "dataset_fingerprint": getattr(self.train_loader.dataset, "_fingerprint", None),
@@ -151,7 +150,6 @@ class Trainer:
         with temporary.open("wb") as stream:
             torch.save(state, stream)
         replace_checkpoint(temporary, path)
-        # 新文件完整落盘后，只清理这个目录中更早的检查点文件。
         root = checkpoint_dir.resolve()
         saved = [p for p in checkpoint_dir.glob("checkpoint-*.pt")
                  if p.stem.removeprefix("checkpoint-").isdigit()]
@@ -199,7 +197,7 @@ class Trainer:
         print("未找到检查点，从头训练。")
 
     def save_model(self, name="final"):
-        """保存模型和配套分词器，best 与 final 使用不同目录。"""
+        """保存模型和分词器。"""
         save_dir = self.training_config.output_dir / name
 
         self.model.save_pretrained(save_dir)
@@ -208,7 +206,7 @@ class Trainer:
         tqdm.write(f"模型已保存到：{save_dir}")
 
     def compute_metrics(self, labels, predictions):
-        """统一计算整个验证集的指标，P/R/F1 按类别样本数加权。"""
+        """P/R/F1 按各类别的样本数加权。"""
         return {
             "accuracy": float(accuracy_score(labels, predictions)),
             "f1": float(f1_score(labels, predictions, average="weighted", zero_division=0)),
@@ -246,7 +244,6 @@ class Trainer:
             if not all_labels:
                 raise ValueError("验证集没有可用样本，无法计算验证 loss。")
 
-            # 完整遍历后计算；除以样本数，而不是 batch 数。
             metrics = self.compute_metrics(all_labels, all_preds)
             if self.training_config.show_classification_report:
                 tqdm.write("\nDetailed Classification Report:")
@@ -297,7 +294,6 @@ class Trainer:
             tqdm.write("触发早停：验证 loss 持续未改善，最佳模型保存在 best 目录。")
 
     def train(self):
-        """执行训练循环。"""
         try:
             if self.should_stop_early:
                 tqdm.write("恢复的 checkpoint 已达到早停条件；提高 patience 或设为 0 可继续训练。")
@@ -324,16 +320,13 @@ class Trainer:
                 )
 
                 for batch_index, batch in progress:
-                    # collator 已经把数据整理成 Tensor
                     batch = {
                         k: v.to(self.device)
                         for k, v in batch.items()
                     }
 
-                    # 清空上一批的梯度
                     self.optimizer.zero_grad(set_to_none=True)
 
-                    # 前向计算；传入 labels 后模型会计算 loss
                     with torch.autocast(
                         device_type=self.device.type,
                         dtype=torch.bfloat16,
@@ -354,7 +347,6 @@ class Trainer:
                     total_loss += loss_value * batch_size
                     total_samples += batch_size
 
-                    # 记录每一步的损失
                     self.writer.add_scalar(
                         "train/step_loss",
                         loss_value,
@@ -378,7 +370,6 @@ class Trainer:
                     if self.step % self.training_config.checkpoint_steps == 0:
                         self.save_checkpoint(epoch, batch_index + 1, total_loss, total_samples)
 
-                # 按样本数计算本轮平均损失
                 average_loss = total_loss / total_samples
 
                 self.writer.add_scalar(
@@ -400,31 +391,25 @@ class Trainer:
                 if self.should_stop_early:
                     break
 
-            # 所有轮次完成后保存
             self.save_model()
 
         finally:
-            # 正常结束或发生异常都关闭日志
             self.writer.close()
 
 
 def train():
-    """准备训练所需对象，再启动训练器。"""
     training_config = TrainConfig()
 
-    # 1. 选择设备
     device = torch.device(
         "cuda" if torch.cuda.is_available() else "cpu"
     )
     print(f"使用设备：{device}")
 
-    # 2. 加载预处理后的训练集
     train_dataset = get_dataset("train")
 
     if len(train_dataset) == 0:
         raise ValueError("训练集为空，请检查预处理结果。")
 
-    # 预处理时使用了 ClassLabel，直接读取其中的类别顺序
     labels = train_dataset.features["label"].names
 
     id2label = {
@@ -434,7 +419,6 @@ def train():
         label: i for i, label in id2label.items()
     }
 
-    # 3. 创建 DataLoader
     train_loader = DataLoader(
         train_dataset,
         batch_size=training_config.batch_size,
@@ -452,14 +436,11 @@ def train():
         shuffle=False,
         collate_fn=default_data_collator,
     )
-    # 4. 加载分词器
-    # 数据已经编码过；这里加载是为了随训练后的模型一起保存
     tokenizer = AutoTokenizer.from_pretrained(
         BERT_MODEL_PATH,
         local_files_only=True,
     )
 
-    # 5. 加载分类模型，先移到设备，再创建优化器
     model = BertForSequenceClassification.from_pretrained(
         BERT_MODEL_PATH,
         num_labels=len(labels),
@@ -468,13 +449,11 @@ def train():
         local_files_only=True,
     ).to(device)
 
-    # 6. 创建优化器，只创建一次
     optimizer = torch.optim.AdamW(
         model.parameters(),
         lr=training_config.learning_rate,
     )
 
-    # 7. 创建并运行训练器
     runner = Trainer(
         model=model,
         tokenizer=tokenizer,

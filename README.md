@@ -1,127 +1,93 @@
-# BERT Product Classifier
+# BERT 商品分类
 
-基于 BERT 的中文商品标题分类项目，支持数据预处理、模型微调、断点恢复、评估、FastAPI 批量预测和 React 可视化操作。当前标签映射包含 30 个商品类别。
+用 BERT 对中文商品标题做分类。训练使用 PyTorch，接口使用 FastAPI，前端使用 React。现有模型包含 30 个商品类别，可通过 LangChain 工作流检索训练集中的相似商品。
 
-## 功能
-
-- **数据处理**：读取 TSV 数据，生成类别映射并完成文本编码。
-- **模型训练**：支持 GPU / CPU、CUDA BF16 混合精度、早停和 TensorBoard 日志。
-- **训练恢复**：保存模型、优化器、训练位置与随机状态，自动恢复最近检查点。
-- **模型评估**：计算 loss、accuracy 及 weighted precision、recall、F1。
-- **推理服务**：提供命令行预测、批量分类 API、健康检查和 Swagger 文档。
-- **前端界面**：React 商品分类页面，支持批量输入、结果展示、JSON 导出和服务状态检查。
-
-## 项目结构
+## 目录
 
 ```text
-bert-product-classifier/
-├── data/
-│   └── examples/                 # 数据格式示例
-│       ├── train.tsv
-│       ├── valid.tsv
-│       └── test.tsv
-├── frontend/                      # React + Vite 前端
+bert-classifier/
+├── data/examples/           # TSV 数据格式示例
+├── frontend/
 │   ├── public/favicon.svg
 │   ├── src/
-│   │   ├── App.jsx                # 分类页面与接口交互
-│   │   ├── main.jsx               # React 入口
-│   │   └── styles.css             # 响应式样式
+│   │   ├── App.jsx          # 分类页面
+│   │   ├── main.jsx
+│   │   └── styles.css
 │   ├── index.html
 │   ├── package.json
 │   ├── package-lock.json
-│   └── vite.config.js             # 开发服务与 API 代理
+│   └── vite.config.js
 ├── src/
-│   ├── __init__.py
-│   ├── __main__.py                # 命令行入口
+│   ├── __main__.py          # 命令行入口
 │   ├── configuration/
-│   │   ├── __init__.py
-│   │   └── config.py              # 路径与基础参数
+│   │   └── config.py        # 路径和训练参数
 │   ├── process/
-│   │   ├── __init__.py
-│   │   ├── preprocess.py          # 数据预处理
-│   │   └── dataset.py             # 数据集加载
+│   │   ├── preprocess.py    # 数据预处理
+│   │   └── dataset.py       # 数据加载
 │   ├── runner/
-│   │   ├── __init__.py
-│   │   ├── train.py               # 训练、验证与检查点管理
-│   │   ├── evaluate.py            # 离线评估
-│   │   └── predict.py             # 模型加载与预测
+│   │   ├── train.py         # 训练与检查点管理
+│   │   ├── evaluate.py      # 模型评估
+│   │   └── predict.py       # 预测
+│   ├── retrieval/
+│   │   ├── corpus.py       # 样本清理与抽样
+│   │   ├── index.py        # 本地 embedding 与 FAISS 索引
+│   │   ├── workflow.py     # LangChain 工具与 LCEL 工作流
+│   │   └── service.py      # 索引状态及加载
 │   └── web/
-│       ├── __init__.py
-│       └── main.py                # FastAPI 应用
+│       └── main.py          # API 与前端静态文件服务
 ├── tests/
 │   ├── test_api.py
 │   ├── test_predict.py
+│   ├── test_retrieval.py
 │   └── test_train_checkpoint.py
+├── label_mapping.txt
+├── requirements.txt
+├── requirements-dev.txt
+├── requirements-retrieval.txt
 ├── .gitignore
-├── label_mapping.txt              # 类别编号与名称
-├── requirements.txt               # 运行依赖
-├── requirements-dev.txt           # 测试依赖
 └── README.md
 ```
 
-模型、完整数据和训练产物不包含在仓库中，本地目录约定如下：
+## 环境
 
-| 路径 | 用途 |
-| --- | --- |
-| `data/raw/` | 原始训练、验证和测试数据 |
-| `data/processed/` | 预处理后的 Hugging Face 数据集 |
-| `models/bert-base-chinese/` | BERT 基础模型与分词器 |
-| `ckp/checkpoints/` | 可恢复的训练检查点 |
-| `ckp/best/` | 验证 loss 最低的模型与分词器 |
-| `ckp/final/` | 训练结束时的模型与分词器 |
-| `logs/` | TensorBoard 日志 |
+- Python 3.11 或 3.12
+- Node.js 22.12+
+- GPU 可选；未检测到 CUDA 时使用 CPU
 
-## 安装
-
-推荐使用 Python 3.11 或 3.12，前端构建需要 Node.js 22.12+。以下命令均在项目根目录执行，并使用已安装项目依赖的 Python 环境。
-
-```bash
-python -m venv .venv
-```
-
-激活虚拟环境：
+在项目根目录安装 Python 依赖：
 
 ```powershell
-# Windows PowerShell
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-```bash
-# Linux / macOS
-source .venv/bin/activate
-```
-
-安装运行依赖：
-
-```bash
 python -m pip install -r requirements.txt
 ```
 
-PyTorch 的 CPU / CUDA 构建可根据运行环境选择，参见 [官方安装说明](https://pytorch.org/get-started/locally/)。
+Linux / macOS 用 `source .venv/bin/activate` 激活环境。PyTorch 安装可参考[官方说明](https://pytorch.org/get-started/locally/)，选择对应的 CPU 或 CUDA 版本。
 
-## 数据与模型准备
+## 数据和模型
 
-### 数据格式
+完整数据集和模型权重不在仓库中，需要放到以下位置：
 
-在 `data/raw/` 下准备 `train.txt`、`valid.txt` 和 `test.txt`。文件使用 UTF-8 编码，以制表符分隔，包含 `label` 和 `text_a` 两列：
+| 路径 | 内容 |
+| --- | --- |
+| `data/raw/train.txt` | 训练集 |
+| `data/raw/valid.txt` | 验证集 |
+| `data/raw/test.txt` | 测试集 |
+| `models/bert-base-chinese/` | BERT 基础模型配置、权重和分词器 |
+
+基础模型可从 [bert-base-chinese](https://huggingface.co/google-bert/bert-base-chinese) 下载。
+
+数据为 UTF-8 编码的 TSV 文件，首行包含 `label` 和 `text_a`，两列之间用制表符分隔：
 
 ```text
 label	text_a
-乳品	纯牛奶整箱250ml早餐奶
-鞋靴箱包	男士轻便跑步运动鞋
+乳品	纯牛奶整箱250ml
+鞋靴箱包	男士跑步运动鞋
 ```
 
-验证集和测试集的类别须包含在训练集中。`data/examples/` 提供少量手写格式示例，不能用于衡量模型效果。类别编号由训练集标签排序生成，并写入 `label_mapping.txt`。
+验证集和测试集的标签必须在训练集中出现。`data/examples/` 中是格式示例。预处理时按训练集标签排序，生成 `label_mapping.txt`。
 
-### 模型文件
-
-将 [bert-base-chinese](https://huggingface.co/google-bert/bert-base-chinese) 的模型配置、权重及分词器文件放入 `models/bert-base-chinese/`。
-
-训练后，模型和分词器分别保存到 `ckp/best/` 与 `ckp/final/`。预测服务默认加载 `ckp/best/`；已有兼容的微调模型时，可直接启动服务。
-
-## 使用
-
-### 预处理、训练与评估
+## 训练和评估
 
 ```bash
 python -m src preprocess
@@ -130,27 +96,21 @@ python -m src evaluate --split validation
 python -m src evaluate --split test
 ```
 
-训练默认恢复已有检查点。新实验可将 `TrainConfig.resume` 设为 `False`，或使用新的 `output_dir`；恢复训练时须保持数据、批次和标签配置一致。
+训练包含早停、断点恢复和 TensorBoard 日志。默认恢复最近的有效检查点；更换数据或重新训练时，在 `TrainConfig` 中设置 `resume=False` 或更换 `output_dir`。
 
-### 命令行预测
+| 输出目录 | 内容 |
+| --- | --- |
+| `data/processed/` | 编码后的数据集 |
+| `ckp/checkpoints/` | 训练检查点，保留最近 3 个 |
+| `ckp/best/` | 验证 loss 最低的模型和分词器 |
+| `ckp/final/` | 训练结束时的模型和分词器 |
+| `logs/` | TensorBoard 日志 |
 
-```bash
-python -m src predict "纯牛奶整箱250ml" "男士跑步运动鞋"
-```
+路径、学习率、batch size 等参数见 `src/configuration/config.py`；验证间隔、检查点和早停设置见 `src/runner/train.py` 中的 `TrainConfig`。
 
-可通过 `--model-path` 指定模型目录，通过 `--device cpu` 强制使用 CPU。
+## 运行页面
 
-### 启动 API
-
-```bash
-python -m src serve --host 127.0.0.1 --port 8000
-```
-
-模型加载完成后，访问 <http://127.0.0.1:8000/docs> 调试接口。开发时可添加 `--reload`。
-
-### 前端界面
-
-首次使用时安装依赖并构建：
+已有微调模型时，构建前端并启动服务：
 
 ```bash
 npm --prefix frontend ci
@@ -158,74 +118,107 @@ npm --prefix frontend run build
 python -m src serve
 ```
 
-构建完成后启动或重启后端，访问 **<http://127.0.0.1:8000>** 即可使用分类页面。前端和 API 使用同一个地址，无需额外启动 Node 服务。页面支持每行一条标题、填入示例、批量分类、结果导出和服务重连。
+- 页面：<http://127.0.0.1:8000>
+- API 文档：<http://127.0.0.1:8000/docs>
 
-开发前端时，在后端运行的同时，另开终端执行：
+服务默认读取 `ckp/best/`。模型目录必须同时包含模型和分词器。更换端口用 `python -m src serve --port 8001`。
+
+开发前端时，保持后端运行，另开终端执行 `npm --prefix frontend run dev`，访问 <http://127.0.0.1:5173>。接口代理默认指向 `http://127.0.0.1:8000`，可在 `frontend/.env.local` 中设置 `VITE_API_TARGET`。
+
+## 相似商品检索
+
+安装可选依赖并建立索引：
 
 ```bash
-npm --prefix frontend run dev
+python -m pip install -r requirements-retrieval.txt
+python -m src build-index
 ```
 
-访问 <http://127.0.0.1:5173>。Vite 将接口请求代理至 `http://127.0.0.1:8000`，可在 `frontend/.env.local` 中通过 `VITE_API_TARGET` 更换后端地址。前端构建产物 `frontend/dist/` 和依赖 `node_modules/` 不提交到仓库。
+首次建库会下载 `BAAI/bge-small-zh-v1.5` 至 `models/bge-small-zh-v1.5/`。Embedding 在 CPU 上运行，完成下载后，服务只读取本地模型和索引，不调用 LLM 或云端接口。LangChain 的远程追踪在此工作流中关闭。
 
+知识库只读取 `data/raw/train.txt`。建库时清理空标题、重复标题和标签冲突，再按每类最多 200 条、随机种子 42 抽样。使用全量合格样本可执行：
 
-## API
+```bash
+python -m src build-index --max-per-class 0
+```
 
-| 方法 | 路径 | 说明 |
+索引保存在 `data/indexes/products/`，包含版本指针、FAISS 文件和 JSON 元数据，不使用 pickle。重建失败时保留原索引；以前的完整版本保留在本地目录中。模型、标签、数据指纹在加载索引时核对，发生不匹配需要重新建库。索引和模型不提交到 Git。
+
+重启服务并勾选页面上的“显示相似商品”，即可展开参考商品、原标签、余弦相似度和来源编号。默认最多 3 条，排除与输入完全相同的标题。相似度不是 BERT 的分类置信分数，参考商品不改变分类结果。
+
+工作流为固定的 LangChain LCEL 流程：
+
+```text
+输入校验 → RunnableParallel ── BERT 分类工具 ──┐
+                           └─ 商品检索工具 ──┴→ 按输入顺序合并
+```
+
+这是分类与语义检索工作流，不包含自主工具选择或文本生成。检索依赖或索引缺失时，原分类功能仍可使用。
+
+服务读取以下进程环境变量：
+
+| 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `GET` | `/` | React 页面；未构建前端时跳转至 API 文档 |
-| `GET` | `/health` | 返回模型状态、设备及类别数 |
-| `GET` | `/labels` | 返回按类别编号排列的标签列表 |
-| `POST` | `/predict` | 批量预测商品标题 |
-| `GET` | `/docs` | Swagger UI |
+| `CLASSIFIER_MODEL_PATH` | `ckp/best/` | 微调模型目录 |
+| `CLASSIFIER_DEVICE` | 自动选择 | 可设为 `cpu` 或 `cuda` |
+| `RETRIEVAL_INDEX_PATH` | `data/indexes/products/` | 服务读取的索引目录 |
+| `EMBEDDING_MODEL_PATH` | `models/bge-small-zh-v1.5/` | 服务读取的 embedding 目录 |
 
-### 预测请求
+## 预测接口
 
-```http
-POST /predict
-Content-Type: application/json
-```
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| `GET` | `/health` | 模型状态、设备和类别数 |
+| `GET` | `/labels` | 类别列表 |
+| `POST` | `/predict` | 商品分类 |
+| `GET` | `/retrieval/health` | 检索状态、模型、索引条数和不可用原因 |
+| `POST` | `/analyze` | 分类并返回最多 3 条相似商品 |
+
+`POST /predict` 接收 JSON：
 
 ```json
-{
-  "texts": ["纯牛奶整箱250ml", "男士跑步运动鞋"]
-}
+{"texts": ["纯牛奶整箱250ml"]}
 ```
 
-响应示例，具体类别和分数以实际模型输出为准：
+返回格式如下，分数以模型实际输出为准：
 
 ```json
 {
   "predictions": [
-    {"text": "纯牛奶整箱250ml", "label_id": 3, "label": "乳品", "confidence": 0.98},
-    {"text": "男士跑步运动鞋", "label_id": 26, "label": "鞋靴箱包", "confidence": 0.95}
+    {"text": "纯牛奶整箱250ml", "label_id": 3, "label": "乳品", "confidence": 0.98}
   ]
 }
 ```
 
-每次请求支持 1–32 条文本，单条最多 2000 个字符。空白文本或不合法参数返回 `422`；推理失败返回 `500`。文本编码时截断至 128 tokens。`confidence` 为 softmax 分数，不等同于预测正确率。
+每次最多 32 条，每条最多 2000 个字符。分词后截断到 128 tokens。`confidence` 是 softmax 分数，不是准确率。不合法的输入返回 `422`，推理失败返回 `500`。
 
-## 配置
+`POST /analyze` 使用相同的请求格式，每条分类结果额外包含 `neighbors`：
 
-基础参数位于 `src/configuration/config.py`，训练策略位于 `src/runner/train.py` 的 `TrainConfig`。
+```json
+{
+  "predictions": [
+    {
+      "text": "纯牛奶整箱250ml",
+      "label_id": 3,
+      "label": "乳品",
+      "confidence": 0.98,
+      "neighbors": [
+        {"source_id": "样本的SHA256编号", "text": "早餐纯牛奶", "label": "乳品", "label_id": 3, "similarity": 0.85}
+      ]
+    }
+  ]
+}
+```
 
-| 参数 | 默认值 | 说明 |
-| --- | --- | --- |
-| `BATCH_SIZE` | `16` | 训练批次大小 |
-| `LEARNING_RATE` | `1e-5` | 学习率 |
-| `EPOCHS` | `10` | 最大训练轮数 |
-| `MAX_LENGTH` | `128` | 编码后的最大序列长度 |
-| `checkpoint_steps` | `100` | 检查点保存间隔 |
-| `checkpoint_limit` | `3` | 保留的最近检查点数量 |
-| `eval_steps` | `1000` | 验证间隔 |
-| `early_stopping_patience` | `5` | 允许连续无有效改善的验证次数，`0` 关闭早停 |
+示例中的分数仅说明格式。参考商品不足 3 条时返回实际数量，没有参考时返回空列表。检索不可用时 `/analyze` 返回 `503`，详细原因可通过 `/retrieval/health` 查询；该健康接口始终以 `200` 返回 `ready` 或 `unavailable` 状态。
 
-API 启动时还支持以下进程环境变量：
+也可以在命令行预测：
 
-| 环境变量 | 默认值 | 说明 |
-| --- | --- | --- |
-| `CLASSIFIER_MODEL_PATH` | `ckp/best/` | 微调模型与分词器目录 |
-| `CLASSIFIER_DEVICE` | 自动选择 | `cpu` 或 `cuda`，默认优先使用 CUDA |
+```bash
+python -m src predict "纯牛奶整箱250ml" "男士跑步运动鞋"
+```
+
+用 `--model-path` 指定模型目录，`--device cpu` 指定 CPU。
 
 ## 测试
 
@@ -234,4 +227,4 @@ python -m pip install -r requirements-dev.txt
 python -m unittest discover -s tests -v
 ```
 
-测试覆盖接口校验、预测结果、训练恢复、早停与检查点保留策略，无需完整数据集或 BERT 权重。CUDA 相关测试在无 GPU 时自动跳过。
+测试使用固定向量、小模型和替代预测器，不下载模型。安装检索依赖后会运行索引、工作流和检索 API 测试；未安装时跳过依赖 FAISS 的测试。无 GPU 时跳过 CUDA 测试。

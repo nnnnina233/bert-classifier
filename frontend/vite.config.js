@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: true,
       proxy: Object.fromEntries(
-        ['/health', '/labels', '/predict', '/docs', '/openapi.json'].map(
+        ['/health', '/labels', '/predict', '/analyze', '/retrieval', '/docs', '/openapi.json'].map(
           (path) => [path, { target, changeOrigin: true }],
         ),
       ),

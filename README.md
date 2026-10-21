@@ -1,6 +1,14 @@
-# BERT 商品分类
+# BERT 与 LangChain 工作流练习
 
-用 BERT 对中文商品标题做分类。训练使用 PyTorch，接口使用 FastAPI，前端使用 React。现有模型包含 30 个商品类别，可通过 LangChain 工作流检索训练集中的相似商品。
+以中文商品标题分类为例，练习 BERT 微调、模型推理和 LangChain 流程编排。接口和页面用于查看分类结果与相似商品，现有模型包含 30 个商品类别。
+
+## 练习内容
+
+- **BERT**：使用预训练模型完成文本分类，理解分词、标签映射、训练与评估，以及模型保存和断点恢复。
+- **LangChain**：把分类和检索函数封装成工具，使用 `RunnableLambda`、`RunnableParallel` 和 `|` 组合流程，观察数据如何在节点间传递。
+- **向量检索**：用本地 embedding 模型编码商品标题，通过 FAISS 查找相似样本，理解相似度、元数据和索引保存加载。
+
+BERT 使用 Hugging Face 提供的预训练模型；LangChain 部分采用代码预先确定的工作流，不调用 LLM。学习重点是理解各部分的输入输出，以及如何将它们串联起来。
 
 ## 目录
 
@@ -87,7 +95,7 @@ label	text_a
 
 验证集和测试集的标签必须在训练集中出现。`data/examples/` 中是格式示例。预处理时按训练集标签排序，生成 `label_mapping.txt`。
 
-## 训练和评估
+## BERT 训练和评估
 
 ```bash
 python -m src preprocess
@@ -125,7 +133,7 @@ python -m src serve
 
 开发前端时，保持后端运行，另开终端执行 `npm --prefix frontend run dev`，访问 <http://127.0.0.1:5173>。接口代理默认指向 `http://127.0.0.1:8000`，可在 `frontend/.env.local` 中设置 `VITE_API_TARGET`。
 
-## 相似商品检索
+## LangChain 工作流与相似商品检索
 
 安装可选依赖并建立索引：
 
@@ -146,14 +154,14 @@ python -m src build-index --max-per-class 0
 
 重启服务并勾选页面上的“显示相似商品”，即可展开参考商品、原标签、余弦相似度和来源编号。默认最多 3 条，排除与输入完全相同的标题。相似度不是 BERT 的分类置信分数，参考商品不改变分类结果。
 
-工作流为固定的 LangChain LCEL 流程：
+这部分将分类和检索作为两个工具，用 LangChain LCEL 并行执行，再合并结果：
 
 ```text
 输入校验 → RunnableParallel ── BERT 分类工具 ──┐
                            └─ 商品检索工具 ──┴→ 按输入顺序合并
 ```
 
-这是分类与语义检索工作流，不包含自主工具选择或文本生成。检索依赖或索引缺失时，原分类功能仍可使用。
+可以从 `src/retrieval/workflow.py` 开始阅读，重点看工具包装、并行节点和结果合并。检索依赖或索引缺失时，原分类功能仍可使用。
 
 服务读取以下进程环境变量：
 
